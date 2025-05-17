@@ -106,7 +106,7 @@ export default function GenzifyConverter() {
             {isConverting ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                loading...
+                transl8ng...
               </>
             ) : (
               <>gEn-Z-iFy!!1! 🤪</>

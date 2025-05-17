@@ -28,3 +28,6 @@ next-env.d.ts
 
 # system
 .DS_Store
+
+# Don't ignore notes - we want these in version control
+# /notes

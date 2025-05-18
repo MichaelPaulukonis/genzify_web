@@ -12,7 +12,7 @@ export async function genzifyText(text: string, emojiLevel: string, fingerprint:
     }
 
     // Store the fingerprint in a cookie for server-side validation
-    cookies().set("genzify_fingerprint", fingerprint, {
+    (await cookies()).set("genzify_fingerprint", fingerprint, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 30, // 30 days

@@ -344,7 +344,7 @@ export default function GenzifyConverter() {
             <div className="bg-white/10 rounded-lg p-3 border border-white/20">
               <div className="flex justify-between items-center">
                 <div className="text-white">
-                  <span className="font-bold">Quota:</span> {remainingRequests} left
+                  <span className="font-bold">Slay cap:</span> {remainingRequests} left
                 </div>
                 <div className="text-white/70 text-sm">Resets in: {timeUntilReset}</div>
               </div>
@@ -352,7 +352,7 @@ export default function GenzifyConverter() {
                 <div
                   className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${(remainingRequests / 10) * 100}%` }}
-                ></div>
+                />
               </div>
             </div>
           </div>

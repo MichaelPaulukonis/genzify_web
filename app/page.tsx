@@ -18,7 +18,7 @@ export default function Home() {
         </div>
 
         <footer className="mt-8 text-center text-white/70 text-sm">
-          <p>made with 💀 by someone who can't even 🙄</p>
+          <p>made with 💀 by <a href="https://michaelpaulukonis.github.io">someone</a> who can't even 🙄</p>
         </footer>
       </div>
       <Toaster />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -8,6 +8,33 @@ import { Label } from "@/components/ui/label"
 import { genzifyText } from "@/app/actions"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import {
+  getFingerprint,
+  hasReachedLimit,
+  incrementRequestCount,
+  getRemainingRequests,
+  formatTimeUntilReset,
+} from "@/utils/usage-tracker"
+import { logger } from "@/utils/logger"
+
+const genZTitles = [
+  "OK BOOMER, HERE'S UR TRANSLATION",
+  "ur gen-zified nonsense, enjoy",
+  "slayified 4 the culture 💅😭",
+  "THIS? this ate. no crumbs.",
+  "translated for those born before wi-fi",
+  "ur daily dose of ✨brainrot✨",
+  "speaketh likeeth the tiketh toketh youth",
+  "help it's giving gen-z 🫠",
+  "NO CAP TRANSLATION INCOMING 🔊",
+  "🧠💥GEN Z BRAIN ACTIVATED💥🧠",
+]
+
+// Local storage keys
+const STORAGE_KEY_OUTPUT = "genzify_output_text"
+const STORAGE_KEY_SHOW_OUTPUT = "genzify_show_output"
+const STORAGE_KEY_TITLE = "genzify_title"
+const STORAGE_KEY_INPUT = "genzify_input_text"
 
 export default function GenzifyConverter() {
   const [inputText, setInputText] = useState("")
@@ -15,9 +42,95 @@ export default function GenzifyConverter() {
   const [emojiLevel, setEmojiLevel] = useState("on")
   const [isConverting, setIsConverting] = useState(false)
   const [showOutput, setShowOutput] = useState(false)
+  const [randomTitle, setRandomTitle] = useState(genZTitles[0])
+  const [remainingRequests, setRemainingRequests] = useState(10)
+  const [timeUntilReset, setTimeUntilReset] = useState("12h 0m")
+  const [fingerprint, setFingerprint] = useState("")
+  const [debugInfo, setDebugInfo] = useState("")
+  const [isClient, setIsClient] = useState(false)
   const { toast } = useToast()
 
-  async function handleConvert() {
+  // Set isClient to true once the component mounts
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Load saved state from localStorage on component mount
+  useEffect(() => {
+    if (!isClient) return
+
+    try {
+      // Load saved state
+      const savedOutput = localStorage.getItem(STORAGE_KEY_OUTPUT)
+      const savedShowOutput = localStorage.getItem(STORAGE_KEY_SHOW_OUTPUT)
+      const savedTitle = localStorage.getItem(STORAGE_KEY_TITLE)
+      const savedInput = localStorage.getItem(STORAGE_KEY_INPUT)
+
+      if (savedOutput) setOutputText(savedOutput)
+      if (savedShowOutput === "true") setShowOutput(true)
+      if (savedTitle) setRandomTitle(savedTitle)
+      if (savedInput) setInputText(savedInput)
+
+      // Initialize fingerprint
+      const fp = getFingerprint()
+      setFingerprint(fp)
+
+      // Update usage info
+      updateUsageInfo()
+    } catch (error) {
+      logger.error("Error initializing:", error)
+      setDebugInfo(`Init error: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    // Update the countdown timer every minute
+    const intervalId = setInterval(() => {
+      updateUsageInfo()
+    }, 60000)
+
+    return () => clearInterval(intervalId)
+  }, [isClient])
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    if (!isClient) return
+
+    try {
+      if (outputText) {
+        localStorage.setItem(STORAGE_KEY_OUTPUT, outputText)
+      }
+
+      localStorage.setItem(STORAGE_KEY_SHOW_OUTPUT, String(showOutput))
+
+      if (randomTitle) {
+        localStorage.setItem(STORAGE_KEY_TITLE, randomTitle)
+      }
+
+      if (inputText) {
+        localStorage.setItem(STORAGE_KEY_INPUT, inputText)
+      }
+    } catch (error) {
+      logger.error("Error saving state:", error)
+    }
+  }, [outputText, showOutput, randomTitle, inputText, isClient])
+
+  // Update usage information
+  const updateUsageInfo = useCallback(() => {
+    if (!isClient) return
+
+    try {
+      const remaining = getRemainingRequests()
+      const resetTime = formatTimeUntilReset()
+      setRemainingRequests(remaining)
+      setTimeUntilReset(resetTime)
+    } catch (error) {
+      logger.error("Error updating usage info:", error)
+      setDebugInfo(`Usage error: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }, [isClient])
+
+  const handleConvert = useCallback(async () => {
+    if (!isClient) return
+
     if (!inputText.trim()) {
       toast({
         title: "bruh... 💀",
@@ -27,32 +140,94 @@ export default function GenzifyConverter() {
       return
     }
 
-    setIsConverting(true)
-
-    try {
-      const result = await genzifyText(inputText, emojiLevel)
-      setOutputText(result)
-      setShowOutput(true)
-    } catch (error) {
+    // Check if user has reached their limit
+    if (hasReachedLimit()) {
       toast({
-        title: "yikes... that's so cringe",
-        description: "something broke, try again later bestie",
+        title: "limit reached bestie 🙅‍♀️",
+        description: `try again in ${timeUntilReset}`,
         variant: "destructive",
       })
-      console.error(error)
+      return
+    }
+
+    setIsConverting(true)
+
+    // Log the input text for user reference
+    logger.user("Original Text:", inputText)
+
+    try {
+      // Increment request count before making the API call
+      incrementRequestCount()
+
+      // Update UI to reflect the new count
+      updateUsageInfo()
+
+      const result = await genzifyText(inputText, emojiLevel, fingerprint)
+
+      if (!result) {
+        throw new Error("Empty result from API")
+      }
+
+      // Log the output translation for user reference
+      logger.user("Gen-Z Translation:", result)
+
+      // Set output text and save to localStorage
+      setOutputText(result)
+      localStorage.setItem(STORAGE_KEY_OUTPUT, result)
+
+      // Set random title and save to localStorage
+      const newTitle = genZTitles[Math.floor(Math.random() * genZTitles.length)]
+      setRandomTitle(newTitle)
+      localStorage.setItem(STORAGE_KEY_TITLE, newTitle)
+
+      // Force showing the output screen and save to localStorage
+      setShowOutput(true)
+      localStorage.setItem(STORAGE_KEY_SHOW_OUTPUT, "true")
+    } catch (error) {
+      logger.error("Error in conversion:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setDebugInfo(`Conversion error: ${errorMessage}`)
+
+      toast({
+        title: "yikes... that's so cringe",
+        description: `something broke: ${errorMessage}`,
+        variant: "destructive",
+      })
     } finally {
       setIsConverting(false)
     }
-  }
+  }, [inputText, emojiLevel, fingerprint, timeUntilReset, toast, updateUsageInfo, isClient])
 
-  function handleReset() {
+  const handleReset = useCallback(() => {
+    if (!isClient) return
+
     setShowOutput(false)
+    localStorage.setItem(STORAGE_KEY_SHOW_OUTPUT, "false")
+
     setInputText("")
+    localStorage.removeItem(STORAGE_KEY_INPUT)
+
     setOutputText("")
+    localStorage.removeItem(STORAGE_KEY_OUTPUT)
+
+    localStorage.removeItem(STORAGE_KEY_TITLE)
+  }, [isClient])
+
+  // Debug display to help troubleshoot
+  const renderDebugInfo = () => {
+    if (!debugInfo) return null
+
+    return (
+      <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded text-white text-sm">
+        <strong>Debug Info:</strong> {debugInfo}
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
+      {renderDebugInfo()}
+
       {!showOutput ? (
         <>
           <div className="space-y-2">
@@ -100,18 +275,26 @@ export default function GenzifyConverter() {
 
           <Button
             onClick={handleConvert}
-            disabled={isConverting}
-            className="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-pink-500 hover:to-yellow-500 text-white font-bold py-4 text-lg hover:animate-pulse transition-all"
+            disabled={isConverting || (isClient && hasReachedLimit())}
+            className="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-pink-500 hover:to-yellow-500 text-white font-bold py-4 text-lg hover:animate-pulse transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isConverting ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                transl8ng...
+                loading...
               </>
+            ) : isClient && hasReachedLimit() ? (
+              <>quota reached bestie 😭</>
             ) : (
               <>gEn-Z-iFy!!1! 🤪</>
             )}
           </Button>
+
+          {isClient && hasReachedLimit() && (
+            <div className="text-center text-white/80 text-sm animate-pulse">
+              come back in {timeUntilReset} for more brain rot
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -119,7 +302,7 @@ export default function GenzifyConverter() {
             <div className="flex justify-between items-center">
               <Label htmlFor="output-text" className="text-white text-lg font-bold flex items-center">
                 <span className="animate-pulse mr-1">✨</span>
-                ur gen-z translation
+                {randomTitle}
               </Label>
               <Button
                 variant="outline"
@@ -135,21 +318,42 @@ export default function GenzifyConverter() {
                 id="output-text"
                 readOnly
                 className="min-h-[200px] bg-white/10 border-white/20 text-white font-medium"
-                value={outputText}
+                value={outputText || "No output received. Please try again."}
               />
               <Button
                 onClick={() => {
-                  navigator.clipboard.writeText(outputText)
-                  toast({
-                    title: "yurrr",
-                    description: "copied to clipboard, bestie",
-                  })
+                  if (isClient) {
+                    navigator.clipboard.writeText(outputText)
+                    toast({
+                      title: "yurrr",
+                      description: "copied to clipboard, bestie",
+                    })
+                  }
                 }}
                 className="absolute bottom-2 right-2 bg-white/20 hover:bg-white/40"
                 size="sm"
+                disabled={!outputText || !isClient}
               >
                 copy
               </Button>
+            </div>
+          </div>
+
+          <div className="space-y-4 mt-4">
+            {/* Usage Quota Indicator */}
+            <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+              <div className="flex justify-between items-center">
+                <div className="text-white">
+                  <span className="font-bold">Quota:</span> {remainingRequests} left
+                </div>
+                <div className="text-white/70 text-sm">Resets in: {timeUntilReset}</div>
+              </div>
+              <div className="mt-2 w-full bg-white/20 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${(remainingRequests / 10) * 100}%` }}
+                ></div>
+              </div>
             </div>
           </div>
         </>

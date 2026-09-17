@@ -46,7 +46,6 @@ export default function GenzifyConverter() {
   const [remainingRequests, setRemainingRequests] = useState(10)
   const [timeUntilReset, setTimeUntilReset] = useState("12h 0m")
   const [fingerprint, setFingerprint] = useState("")
-  const [debugInfo, setDebugInfo] = useState("")
   const [isClient, setIsClient] = useState(false)
   const { toast } = useToast()
 
@@ -79,7 +78,6 @@ export default function GenzifyConverter() {
       updateUsageInfo()
     } catch (error) {
       logger.error("Error initializing:", error)
-      setDebugInfo(`Init error: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     // Update the countdown timer every minute
@@ -124,7 +122,6 @@ export default function GenzifyConverter() {
       setTimeUntilReset(resetTime)
     } catch (error) {
       logger.error("Error updating usage info:", error)
-      setDebugInfo(`Usage error: ${error instanceof Error ? error.message : String(error)}`)
     }
   }, [isClient])
 
@@ -165,7 +162,6 @@ export default function GenzifyConverter() {
       const result = await genzifyText(inputText, emojiLevel, fingerprint)
 
       if (!result.ok) {
-        setDebugInfo(result.message)
         toast({
           title: result.code === "service_unavailable" ? "the converter needs a refill" : "yikes... that's so cringe",
           description: result.message,
@@ -191,8 +187,7 @@ export default function GenzifyConverter() {
       localStorage.setItem(STORAGE_KEY_SHOW_OUTPUT, "true")
     } catch (error) {
       logger.error("Error in conversion:", error)
-      const safeMessage = "We couldn't convert that text right now. Please try again."
-      setDebugInfo(safeMessage)
+      const safeMessage = "we couldn't convert that text rn. try again in a sec."
 
       toast({
         title: "yikes... that's so cringe",
@@ -219,21 +214,8 @@ export default function GenzifyConverter() {
     localStorage.removeItem(STORAGE_KEY_TITLE)
   }, [isClient])
 
-  // Debug display to help troubleshoot
-  const renderDebugInfo = () => {
-    if (!debugInfo) return null
-
-    return (
-      <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded text-white text-sm">
-        <strong>Status:</strong> {debugInfo}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      {renderDebugInfo()}
-
       {!showOutput ? (
         <>
           <div className="space-y-2">

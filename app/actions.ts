@@ -82,8 +82,8 @@ Rules:
       ok: false,
       code: isQuotaError ? "service_unavailable" : "invalid_request",
       message: isQuotaError
-        ? "The converter is temporarily out of credits. Please try again later."
-        : "We couldn't convert that text right now. Please try again.",
+        ? "the converter's out of credits rn. tell the owner to check the logs."
+        : "we couldn't convert that text rn. try again in a sec.",
     }
   }
 }

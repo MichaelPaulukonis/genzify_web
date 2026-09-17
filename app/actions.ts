@@ -4,7 +4,15 @@ import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 import { cookies } from "next/headers"
 
-export async function genzifyText(text: string, emojiLevel: string, fingerprint: string): Promise<string> {
+export type GenzifyResult =
+  | { ok: true; text: string }
+  | { ok: false; code: "service_unavailable" | "invalid_request"; message: string }
+
+export async function genzifyText(
+  text: string,
+  emojiLevel: string,
+  fingerprint: string,
+): Promise<GenzifyResult> {
   try {
     // Validate fingerprint (simple check for now)
     if (!fingerprint || !fingerprint.startsWith("fp_")) {
@@ -62,9 +70,20 @@ Rules:
       throw new Error("Empty response from OpenAI")
     }
 
-    return result.text
+    return { ok: true, text: result.text }
   } catch (error) {
-    // Rethrow with more details
-    throw new Error(`Failed to convert text: ${error instanceof Error ? error.message : String(error)}`)
+    const providerMessage = error instanceof Error ? error.message : String(error)
+    const isQuotaError = /no credits|insufficient_quota|quota|billing/i.test(providerMessage)
+
+    // Keep provider details in server logs only; never serialize them to the browser.
+    console.error("[genzify] conversion failed", { isQuotaError, providerMessage })
+
+    return {
+      ok: false,
+      code: isQuotaError ? "service_unavailable" : "invalid_request",
+      message: isQuotaError
+        ? "The converter is temporarily out of credits. Please try again later."
+        : "We couldn't convert that text right now. Please try again.",
+    }
   }
 }

@@ -164,16 +164,22 @@ export default function GenzifyConverter() {
 
       const result = await genzifyText(inputText, emojiLevel, fingerprint)
 
-      if (!result) {
-        throw new Error("Empty result from API")
+      if (!result.ok) {
+        setDebugInfo(result.message)
+        toast({
+          title: result.code === "service_unavailable" ? "the converter needs a refill" : "yikes... that's so cringe",
+          description: result.message,
+          variant: "destructive",
+        })
+        return
       }
 
       // Log the output translation for user reference
-      logger.user("Gen-Z Translation:", result)
+      logger.user("Gen-Z Translation:", result.text)
 
       // Set output text and save to localStorage
-      setOutputText(result)
-      localStorage.setItem(STORAGE_KEY_OUTPUT, result)
+      setOutputText(result.text)
+      localStorage.setItem(STORAGE_KEY_OUTPUT, result.text)
 
       // Set random title and save to localStorage
       const newTitle = genZTitles[Math.floor(Math.random() * genZTitles.length)]
@@ -185,12 +191,12 @@ export default function GenzifyConverter() {
       localStorage.setItem(STORAGE_KEY_SHOW_OUTPUT, "true")
     } catch (error) {
       logger.error("Error in conversion:", error)
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      setDebugInfo(`Conversion error: ${errorMessage}`)
+      const safeMessage = "We couldn't convert that text right now. Please try again."
+      setDebugInfo(safeMessage)
 
       toast({
         title: "yikes... that's so cringe",
-        description: `something broke: ${errorMessage}`,
+        description: safeMessage,
         variant: "destructive",
       })
     } finally {
@@ -219,7 +225,7 @@ export default function GenzifyConverter() {
 
     return (
       <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded text-white text-sm">
-        <strong>Debug Info:</strong> {debugInfo}
+        <strong>Status:</strong> {debugInfo}
       </div>
     )
   }

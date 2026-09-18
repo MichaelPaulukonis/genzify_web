@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "genzify",
+  "project_id": "bade2c8d-5131-49b5-804d-be6019658b8e"
+}
